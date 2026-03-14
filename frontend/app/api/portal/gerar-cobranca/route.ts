@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       pix_qrcode: mensalidade.pix_qrcode,
       pix_copia_cola: mensalidade.pix_copia_cola,
       link_pagamento: mensalidade.link_pagamento,
+      boleto_url: (mensalidade as any).boleto_url ?? null,
     })
   }
 
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
         pix_qrcode: cobranca.pixQrcode,
         pix_copia_cola: cobranca.pixCopiaECola,
         link_pagamento: cobranca.linkPagamento,
+        boleto_url: cobranca.boletoUrl,
         cobranca_gerada_em: new Date().toISOString(),
       })
       .eq('id', mensalidade_id)
@@ -94,6 +96,7 @@ export async function POST(req: NextRequest) {
       pix_qrcode: cobranca.pixQrcode,
       pix_copia_cola: cobranca.pixCopiaECola,
       link_pagamento: cobranca.linkPagamento,
+      boleto_url: cobranca.boletoUrl,
     })
   } catch (err: any) {
     console.error('[gerar-cobranca]', err)

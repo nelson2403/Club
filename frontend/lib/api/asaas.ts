@@ -104,7 +104,7 @@ export async function criarOuBuscarCliente(params: {
 
 // ─── Cobranças ───────────────────────────────────────────────
 
-export async function criarCobrancaPix(params: {
+export async function criarCobrancaCompleto(params: {
   customerId: string
   valor: number
   vencimento: string   // YYYY-MM-DD
@@ -115,7 +115,7 @@ export async function criarCobrancaPix(params: {
     method: 'POST',
     body: JSON.stringify({
       customer: params.customerId,
-      billingType: 'PIX',
+      billingType: 'UNDEFINED', // Gera PIX + Boleto na mesma cobrança
       value: params.valor,
       dueDate: params.vencimento,
       description: params.descricao,
@@ -123,6 +123,17 @@ export async function criarCobrancaPix(params: {
       postalService: false,
     }),
   })
+}
+
+/** @deprecated use criarCobrancaCompleto */
+export async function criarCobrancaPix(params: {
+  customerId: string
+  valor: number
+  vencimento: string
+  descricao: string
+  externalReference: string
+}): Promise<AsaasCobranca> {
+  return criarCobrancaCompleto(params)
 }
 
 export async function buscarQrCodePix(paymentId: string): Promise<AsaasPixQrCode> {
@@ -159,6 +170,7 @@ export async function gerarCobrancaCompleta(params: {
   pixQrcode: string
   pixCopiaECola: string
   linkPagamento: string
+  boletoUrl: string | null
 }> {
   const { socio, mensalidade } = params
 
@@ -179,8 +191,8 @@ export async function gerarCobrancaCompleta(params: {
   const mesLabel = meses[parseInt(mes) - 1]
   const descricao = `Mensalidade ${mesLabel}/${ano} — ${socio.nome}`
 
-  // 3. Criar cobrança PIX
-  const cobranca = await criarCobrancaPix({
+  // 3. Criar cobrança (PIX + Boleto)
+  const cobranca = await criarCobrancaCompleto({
     customerId: cliente.id,
     valor: mensalidade.valor,
     vencimento: mensalidade.data_vencimento,
@@ -188,7 +200,7 @@ export async function gerarCobrancaCompleta(params: {
     externalReference: mensalidade.id,
   })
 
-  // 4. Buscar QR Code
+  // 4. Buscar QR Code PIX
   const qr = await buscarQrCodePix(cobranca.id)
 
   return {
@@ -197,5 +209,6 @@ export async function gerarCobrancaCompleta(params: {
     pixQrcode: qr.encodedImage,
     pixCopiaECola: qr.payload,
     linkPagamento: cobranca.invoiceUrl,
+    boletoUrl: cobranca.bankSlipUrl ?? null,
   }
 }

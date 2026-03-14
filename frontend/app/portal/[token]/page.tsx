@@ -1,14 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
-import { CheckCircle, Clock, AlertCircle, Copy, ExternalLink, QrCode, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
-
-// Cliente público com anon key — somente leitura via service role na API route
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { CheckCircle, Clock, AlertCircle, Copy, ExternalLink, QrCode, RefreshCw, ChevronDown, ChevronUp, FileText } from 'lucide-react'
 
 function formatarMoeda(valor: number) {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -40,6 +33,7 @@ interface Mensalidade {
   pix_qrcode: string | null
   pix_copia_cola: string | null
   link_pagamento: string | null
+  boleto_url: string | null
 }
 
 interface Socio {
@@ -65,21 +59,22 @@ function BadgeStatus({ status }: { status: StatusMensalidade }) {
   )
 }
 
-function CartaoPagamento({ mensalidade, token, onPago }: {
+function CartaoPagamento({ mensalidade, token }: {
   mensalidade: Mensalidade
   token: string
-  onPago: () => void
 }) {
   const [expandido, setExpandido] = useState(false)
   const [carregando, setCarregando] = useState(false)
-  const [dadosPix, setDadosPix] = useState<{
+  const [dadosCobranca, setDadosCobranca] = useState<{
     pix_qrcode: string
     pix_copia_cola: string
     link_pagamento: string
+    boleto_url: string | null
   } | null>(mensalidade.pix_copia_cola ? {
     pix_qrcode: mensalidade.pix_qrcode!,
     pix_copia_cola: mensalidade.pix_copia_cola,
     link_pagamento: mensalidade.link_pagamento!,
+    boleto_url: mensalidade.boleto_url,
   } : null)
   const [copiado, setCopiado] = useState(false)
   const [erro, setErro] = useState('')
@@ -95,7 +90,7 @@ function CartaoPagamento({ mensalidade, token, onPago }: {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setDadosPix(data)
+      setDadosCobranca(data)
       setExpandido(true)
     } catch (e: any) {
       setErro(e.message)
@@ -105,8 +100,8 @@ function CartaoPagamento({ mensalidade, token, onPago }: {
   }, [mensalidade.id, token])
 
   const copiarPix = () => {
-    if (!dadosPix?.pix_copia_cola) return
-    navigator.clipboard.writeText(dadosPix.pix_copia_cola)
+    if (!dadosCobranca?.pix_copia_cola) return
+    navigator.clipboard.writeText(dadosCobranca.pix_copia_cola)
     setCopiado(true)
     setTimeout(() => setCopiado(false), 2500)
   }
@@ -133,7 +128,7 @@ function CartaoPagamento({ mensalidade, token, onPago }: {
       {/* Ações para mensalidades pendentes/vencidas */}
       {isPendente && (
         <div className="px-5 pb-4 border-t border-slate-50 pt-3">
-          {!dadosPix ? (
+          {!dadosCobranca ? (
             <button
               onClick={gerarCobranca}
               disabled={carregando}
@@ -142,7 +137,7 @@ function CartaoPagamento({ mensalidade, token, onPago }: {
               {carregando ? (
                 <><RefreshCw className="w-4 h-4 animate-spin" /> Gerando cobrança...</>
               ) : (
-                <><QrCode className="w-4 h-4" /> Gerar PIX para pagamento</>
+                <><QrCode className="w-4 h-4" /> Gerar opções de pagamento</>
               )}
             </button>
           ) : (
@@ -158,13 +153,13 @@ function CartaoPagamento({ mensalidade, token, onPago }: {
 
               {expandido && (
                 <div className="space-y-4">
-                  {/* QR Code */}
+                  {/* QR Code PIX */}
                   <div className="flex flex-col items-center gap-3 p-4 bg-slate-50 rounded-xl">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">QR Code PIX</p>
-                    {dadosPix.pix_qrcode && (
+                    {dadosCobranca.pix_qrcode && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={`data:image/png;base64,${dadosPix.pix_qrcode}`}
+                        src={`data:image/png;base64,${dadosCobranca.pix_qrcode}`}
                         alt="QR Code PIX"
                         className="w-48 h-48"
                       />
@@ -176,7 +171,7 @@ function CartaoPagamento({ mensalidade, token, onPago }: {
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">PIX Copia e Cola</p>
                     <div className="flex items-stretch gap-2">
                       <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-600 font-mono break-all overflow-hidden">
-                        {dadosPix.pix_copia_cola}
+                        {dadosCobranca.pix_copia_cola}
                       </div>
                       <button
                         onClick={copiarPix}
@@ -192,9 +187,22 @@ function CartaoPagamento({ mensalidade, token, onPago }: {
                     </div>
                   </div>
 
-                  {/* Link de pagamento */}
+                  {/* Boleto */}
+                  {dadosCobranca.boleto_url && (
+                    <a
+                      href={dadosCobranca.boleto_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 rounded-xl text-sm transition-colors"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Gerar Boleto Bancário
+                    </a>
+                  )}
+
+                  {/* Link de pagamento (página Asaas) */}
                   <a
-                    href={dadosPix.link_pagamento}
+                    href={dadosCobranca.link_pagamento}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full flex items-center justify-center gap-2 border-2 border-blue-200 text-blue-600 hover:bg-blue-50 font-semibold py-3 rounded-xl text-sm transition-colors"
@@ -354,7 +362,6 @@ export default function PortalSocioPage({ params }: { params: Promise<{ token: s
                 key={m.id}
                 mensalidade={m}
                 token={token}
-                onPago={carregarDados}
               />
             ))}
           </div>
