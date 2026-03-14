@@ -84,13 +84,12 @@ export default function NovoProdutoPage() {
 
       const qtdInicial = parseFloat(form.quantidade_inicial) || 0
 
-      const { error: errEstoque } = await supabase.from('estoque').insert({
-        produto_id: produto.id,
-        quantidade_atual: qtdInicial,
-      })
-      if (errEstoque) throw errEstoque
-
       if (qtdInicial > 0) {
+        const { error: errEstoque } = await supabase.from('estoque')
+          .update({ quantidade_atual: qtdInicial })
+          .eq('produto_id', produto.id)
+        if (errEstoque) throw errEstoque
+
         await supabase.from('movimentacoes_estoque').insert({
           produto_id: produto.id,
           tipo: 'entrada',

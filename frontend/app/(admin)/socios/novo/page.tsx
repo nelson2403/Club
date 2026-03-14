@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,7 +8,7 @@ import { z } from 'zod'
 import { useCriarSocio } from '@/hooks/useSocios'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, User, MapPin, Phone, CreditCard, FileText } from 'lucide-react'
+import { ArrowLeft, User, MapPin, Phone, CreditCard, FileText, UserPlus, Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
@@ -36,6 +37,13 @@ const schema = z.object({
 })
 
 type FormData = z.infer<typeof schema>
+
+interface DependenteForm {
+  nome: string
+  data_nascimento: string
+  grau_parentesco: string
+  cpf: string
+}
 
 const inputCls = cn(
   'w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white',
@@ -73,9 +81,60 @@ function Secao({ titulo, icone: Icon, children }: {
   )
 }
 
+const depVazio: DependenteForm = { nome: '', data_nascimento: '', grau_parentesco: '', cpf: '' }
+
+function FormDependente({
+  dep, onChange, onRemove,
+}: {
+  dep: DependenteForm
+  onChange: (d: DependenteForm) => void
+  onRemove: () => void
+}) {
+  return (
+    <div className="border border-slate-200 rounded-xl p-4 space-y-3 relative bg-slate-50/50">
+      <button type="button" onClick={onRemove}
+        className="absolute top-3 right-3 p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+        <Trash2 className="w-4 h-4" />
+      </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="md:col-span-2">
+          <Campo label="Nome completo" obrigatorio>
+            <input value={dep.nome} onChange={(e) => onChange({ ...dep, nome: e.target.value })}
+              className={inputCls} placeholder="Nome do dependente" />
+          </Campo>
+        </div>
+        <Campo label="Grau de parentesco" obrigatorio>
+          <select value={dep.grau_parentesco}
+            onChange={(e) => onChange({ ...dep, grau_parentesco: e.target.value })}
+            className={selectCls}>
+            <option value="">Selecionar...</option>
+            <option value="filho">Filho(a)</option>
+            <option value="sobrinho">Sobrinho(a)</option>
+            <option value="conjuge">Cônjuge / Companheiro(a)</option>
+            <option value="pai_mae">Pai / Mãe</option>
+            <option value="irmao">Irmão / Irmã</option>
+            <option value="neto">Neto(a)</option>
+            <option value="outro_familiar">Outro familiar</option>
+          </select>
+        </Campo>
+        <Campo label="Data de nascimento">
+          <input type="date" value={dep.data_nascimento}
+            onChange={(e) => onChange({ ...dep, data_nascimento: e.target.value })}
+            className={inputCls} />
+        </Campo>
+        <Campo label="CPF (opcional)">
+          <input value={dep.cpf} onChange={(e) => onChange({ ...dep, cpf: e.target.value })}
+            className={inputCls} placeholder="000.000.000-00" />
+        </Campo>
+      </div>
+    </div>
+  )
+}
+
 export default function NovoSocioPage() {
   const router = useRouter()
   const { mutate: criar, isPending } = useCriarSocio()
+  const [dependentes, setDependentes] = useState<DependenteForm[]>([])
 
   const { data: planos } = useQuery({
     queryKey: ['planos'],
@@ -97,6 +156,35 @@ export default function NovoSocioPage() {
   const planoSelecionado = watch('plano_id')
   const planoEscolhido = planos?.find((p) => p.id === planoSelecionado)
 
+  function adicionarDependente() {
+    setDependentes([...dependentes, { ...depVazio }])
+  }
+
+  function atualizarDependente(i: number, d: DependenteForm) {
+    const arr = [...dependentes]
+    arr[i] = d
+    setDependentes(arr)
+  }
+
+  function removerDependente(i: number) {
+    setDependentes(dependentes.filter((_, idx) => idx !== i))
+  }
+
+  async function salvarDependentes(socioId: string) {
+    const validos = dependentes.filter(d => d.nome.trim() && d.grau_parentesco)
+    if (!validos.length) return
+    await supabase.from('dependentes').insert(
+      validos.map(d => ({
+        socio_id: socioId,
+        nome: d.nome.trim(),
+        data_nascimento: d.data_nascimento || null,
+        grau_parentesco: d.grau_parentesco,
+        cpf: d.cpf || null,
+        ativo: true,
+      }))
+    )
+  }
+
   function onSubmit(data: FormData) {
     const { plano_id, data_inicio_plano, sexo, profissao, estado_civil, como_conheceu, ...dadosSocio } = data
     criar(
@@ -109,6 +197,7 @@ export default function NovoSocioPage() {
               data_inicio: data_inicio_plano, status: 'ativo',
             })
           }
+          await salvarDependentes(socio.id)
           router.push(`/socios/${socio.id}`)
         },
       }
@@ -241,12 +330,33 @@ export default function NovoSocioPage() {
               </p>
             </div>
           )}
-          {planos?.length === 0 && (
-            <p className="text-xs text-slate-400 mt-2">
-              Nenhum plano cadastrado.{' '}
-              <Link href="/planos" className="text-blue-600 hover:underline">Cadastrar plano</Link>
+        </Secao>
+
+        {/* ——— DEPENDENTES ——— */}
+        <Secao titulo={`Dependentes${dependentes.length ? ` (${dependentes.length})` : ''}`} icone={UserPlus}>
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Dependentes não pagam mensalidade. Podem acessar o clube desde que o sócio titular esteja em dia.
             </p>
-          )}
+
+            {dependentes.map((dep, i) => (
+              <FormDependente
+                key={i}
+                dep={dep}
+                onChange={(d) => atualizarDependente(i, d)}
+                onRemove={() => removerDependente(i)}
+              />
+            ))}
+
+            <button
+              type="button"
+              onClick={adicionarDependente}
+              className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-slate-300 rounded-xl text-sm text-slate-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors w-full justify-center"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar Dependente
+            </button>
+          </div>
         </Secao>
 
         <Secao titulo="Informações Adicionais" icone={FileText}>
@@ -271,13 +381,11 @@ export default function NovoSocioPage() {
 
         <div className="flex justify-end gap-3 pb-6">
           <Link href="/socios"
-            className="px-5 py-2.5 text-sm border border-slate-300 rounded-xl text-slate-600
-                       hover:bg-slate-50 transition-colors font-medium">
+            className="px-5 py-2.5 text-sm border border-slate-300 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors font-medium">
             Cancelar
           </Link>
           <button type="submit" disabled={isPending}
-            className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm
-                       font-semibold rounded-xl transition-colors disabled:opacity-60 shadow-sm">
+            className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 shadow-sm">
             {isPending ? 'Cadastrando...' : 'Cadastrar Sócio'}
           </button>
         </div>

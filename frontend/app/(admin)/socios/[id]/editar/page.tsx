@@ -1,15 +1,16 @@
 'use client'
 
-import React, { use } from 'react'
+import React, { use, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, User, MapPin, Phone, FileText } from 'lucide-react'
+import { ArrowLeft, User, MapPin, Phone, FileText, UserPlus, Plus, Trash2, Edit2, Check, X } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import type { Dependente } from '@/types/database'
 
 const supabase = createClient()
 
@@ -67,6 +68,209 @@ function Secao({ titulo, icone: Icon, children }: {
         <h2 className="text-sm font-bold text-slate-800">{titulo}</h2>
       </div>
       <div className="p-6">{children}</div>
+    </div>
+  )
+}
+
+// ——— Seção de Dependentes para a tela de edição ———
+function SecaoDependentes({ socioId }: { socioId: string }) {
+  const qc = useQueryClient()
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [novoAberto, setNovoAberto] = useState(false)
+  const [form, setForm] = useState({ nome: '', data_nascimento: '', grau_parentesco: '', cpf: '' })
+
+  const { data: dependentes } = useQuery({
+    queryKey: ['dependentes', socioId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dependentes')
+        .select('*')
+        .eq('socio_id', socioId)
+        .eq('ativo', true)
+        .order('nome')
+      if (error) throw error
+      return (data ?? []) as Dependente[]
+    },
+  })
+
+  const { mutate: adicionar, isPending: adicionando } = useMutation({
+    mutationFn: async () => {
+      if (!form.nome.trim() || !form.grau_parentesco) throw new Error('Preencha nome e parentesco')
+      const { error } = await supabase.from('dependentes').insert({
+        socio_id: socioId,
+        nome: form.nome.trim(),
+        data_nascimento: form.data_nascimento || null,
+        grau_parentesco: form.grau_parentesco,
+        cpf: form.cpf || null,
+        ativo: true,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['dependentes', socioId] })
+      setForm({ nome: '', data_nascimento: '', grau_parentesco: '', cpf: '' })
+      setNovoAberto(false)
+    },
+  })
+
+  const { mutate: remover } = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('dependentes').update({ ativo: false }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dependentes', socioId] }),
+  })
+
+  const { mutate: salvarEdicao } = useMutation({
+    mutationFn: async ({ id, dados }: { id: string; dados: Partial<Dependente> }) => {
+      const { error } = await supabase.from('dependentes').update(dados).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['dependentes', socioId] })
+      setEditandoId(null)
+    },
+  })
+
+  const [editForm, setEditForm] = useState<Partial<Dependente>>({})
+
+  function abrirEdicao(dep: Dependente) {
+    setEditandoId(dep.id)
+    setEditForm({ nome: dep.nome, data_nascimento: dep.data_nascimento, grau_parentesco: dep.grau_parentesco, cpf: dep.cpf })
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
+            <UserPlus className="w-4 h-4 text-blue-600" />
+          </div>
+          <h2 className="text-sm font-bold text-slate-800">
+            Dependentes {dependentes?.length ? `(${dependentes.length})` : ''}
+          </h2>
+        </div>
+        <button type="button" onClick={() => setNovoAberto(!novoAberto)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+          <Plus className="w-3.5 h-3.5" />
+          Adicionar
+        </button>
+      </div>
+      <div className="p-6 space-y-3">
+        <p className="text-xs text-slate-500">
+          Dependentes não pagam mensalidade. Podem acessar o clube enquanto o sócio titular estiver em dia.
+        </p>
+
+        {/* Formulário novo dependente */}
+        {novoAberto && (
+          <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/40 space-y-3">
+            <p className="text-xs font-semibold text-blue-800">Novo Dependente</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Nome *</label>
+                <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })}
+                  className={inputCls} placeholder="Nome completo" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Parentesco *</label>
+                <select value={form.grau_parentesco} onChange={(e) => setForm({ ...form, grau_parentesco: e.target.value })}
+                  className={cn(inputCls, 'cursor-pointer')}>
+                  <option value="">Selecionar...</option>
+                  <option value="filho">Filho(a)</option>
+                  <option value="sobrinho">Sobrinho(a)</option>
+                  <option value="conjuge">Cônjuge / Companheiro(a)</option>
+                  <option value="pai_mae">Pai / Mãe</option>
+                  <option value="irmao">Irmão / Irmã</option>
+                  <option value="neto">Neto(a)</option>
+                  <option value="outro_familiar">Outro familiar</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Data de nascimento</label>
+                <input type="date" value={form.data_nascimento} onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">CPF (opcional)</label>
+                <input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })}
+                  className={inputCls} placeholder="000.000.000-00" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={() => setNovoAberto(false)}
+                className="px-3 py-1.5 text-xs border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button type="button" onClick={() => adicionar()} disabled={adicionando}
+                className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-60">
+                {adicionando ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Lista de dependentes */}
+        {!dependentes?.length && !novoAberto ? (
+          <p className="text-sm text-slate-400 text-center py-4">Nenhum dependente cadastrado.</p>
+        ) : dependentes?.map((dep) => (
+          <div key={dep.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50/30">
+            {editandoId === dep.id ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2">
+                  <input value={editForm.nome ?? ''} onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })}
+                    className={inputCls} placeholder="Nome" />
+                </div>
+                <select value={editForm.grau_parentesco ?? ''} onChange={(e) => setEditForm({ ...editForm, grau_parentesco: e.target.value })}
+                  className={cn(inputCls, 'cursor-pointer')}>
+                  <option value="">Parentesco...</option>
+                  <option value="filho">Filho(a)</option>
+                  <option value="sobrinho">Sobrinho(a)</option>
+                  <option value="conjuge">Cônjuge / Companheiro(a)</option>
+                  <option value="pai_mae">Pai / Mãe</option>
+                  <option value="irmao">Irmão / Irmã</option>
+                  <option value="neto">Neto(a)</option>
+                  <option value="outro_familiar">Outro familiar</option>
+                </select>
+                <input type="date" value={editForm.data_nascimento ?? ''} onChange={(e) => setEditForm({ ...editForm, data_nascimento: e.target.value })}
+                  className={inputCls} />
+                <input value={editForm.cpf ?? ''} onChange={(e) => setEditForm({ ...editForm, cpf: e.target.value })}
+                  className={inputCls} placeholder="CPF" />
+                <div className="flex gap-2 md:col-span-2">
+                  <button type="button" onClick={() => setEditandoId(null)}
+                    className="px-3 py-1.5 text-xs border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={() => salvarEdicao({ id: dep.id, dados: editForm })}
+                    className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">{dep.nome}</p>
+                  <p className="text-xs text-slate-500 mt-0.5 capitalize">{dep.grau_parentesco}</p>
+                  {dep.data_nascimento && (
+                    <p className="text-xs text-slate-400">{new Date(dep.data_nascimento + 'T12:00').toLocaleDateString('pt-BR')}</p>
+                  )}
+                  {dep.cpf && <p className="text-xs text-slate-400 font-mono">{dep.cpf}</p>}
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  <button type="button" onClick={() => abrirEdicao(dep)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button type="button" onClick={() => { if (confirm('Remover este dependente?')) remover(dep.id) }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -261,6 +465,9 @@ export default function EditarSocioPage({ params }: { params: Promise<{ id: stri
             </Campo>
           </div>
         </Secao>
+
+        {/* Dependentes — gerenciados em tempo real no banco */}
+        <SecaoDependentes socioId={id} />
 
         {isError && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">

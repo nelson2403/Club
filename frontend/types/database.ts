@@ -333,3 +333,56 @@ export interface ItemCarrinho {
   preco_unitario: number
   subtotal: number
 }
+
+// ============================================================
+// DEPENDENTES
+// ============================================================
+
+export interface Dependente {
+  id: string
+  socio_id: string
+  nome: string
+  data_nascimento?: string
+  grau_parentesco: string
+  cpf?: string
+  foto_url?: string
+  ativo: boolean
+  created_at: string
+  updated_at: string
+  // joins
+  socios?: Socio
+}
+
+// ============================================================
+// CONTROLE DE ACESSO
+// ============================================================
+
+export interface AcessoBiometria {
+  id: string
+  socio_id?: string
+  dependente_id?: string
+  tipo: 'biometria' | 'codigo' | 'cartao'
+  codigo?: string
+  descricao?: string
+  ativo: boolean
+  created_at: string
+  // joins
+  socios?: Pick<Socio, 'id' | 'nome'>
+  dependentes?: Pick<Dependente, 'id' | 'nome' | 'grau_parentesco'>
+}
+
+export interface RegistroAcesso {
+  id: string
+  socio_id?: string
+  dependente_id?: string
+  data_hora: string
+  tipo: 'entrada' | 'saida'
+  liberado: boolean
+  motivo_bloqueio?: string
+  terminal?: string
+  usuario_id?: string
+  created_at: string
+  // joins
+  socios?: Pick<Socio, 'id' | 'nome' | 'status'>
+  dependentes?: Pick<Dependente, 'id' | 'nome' | 'grau_parentesco'>
+}

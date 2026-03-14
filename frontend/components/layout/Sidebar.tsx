@@ -9,6 +9,7 @@ import {
   BarChart3, DollarSign, Settings, UserCog,
   BellRing, ChevronDown, ChevronRight, AlertCircle,
   ShoppingBag, ClipboardList, TrendingUp, Boxes,
+  UserPlus, DoorOpen, Fingerprint, History,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -45,13 +46,19 @@ const navGroups: NavGroup[] = [
     items: [
       {
         href: '/socios',
-        label: 'Cadastro de Sócios',
+        label: 'Sócios',
         icon: Users,
         roles: ['admin', 'gerente', 'master', 'administrador'],
         children: [
           { href: '/socios', label: 'Todos os Sócios' },
           { href: '/socios/novo', label: 'Novo Sócio' },
         ],
+      },
+      {
+        href: '/dependentes',
+        label: 'Dependentes',
+        icon: UserPlus,
+        roles: ['admin', 'gerente', 'master', 'administrador'],
       },
       {
         href: '/mensalidades',
@@ -128,6 +135,22 @@ const navGroups: NavGroup[] = [
         label: 'Relatórios',
         icon: BarChart3,
         roles: ['admin', 'gerente', 'master', 'administrador'],
+      },
+    ],
+  },
+  {
+    label: 'Controle de Acesso',
+    items: [
+      {
+        href: '/controle-acesso',
+        label: 'Registro de Acesso',
+        icon: DoorOpen,
+        roles: ['admin', 'gerente', 'master', 'administrador', 'operador'],
+        children: [
+          { href: '/controle-acesso', label: 'Painel de Acesso' },
+          { href: '/controle-acesso/historico', label: 'Histórico' },
+          { href: '/controle-acesso/biometrias', label: 'Biometrias e Códigos' },
+        ],
       },
     ],
   },
