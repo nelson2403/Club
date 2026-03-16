@@ -13,7 +13,6 @@ function ModalPlano({ plano, onClose }: { plano?: any; onClose: () => void }) {
   const editando = !!plano
   const [nome, setNome] = useState(plano?.nome_plano ?? '')
   const [valor, setValor] = useState(plano?.valor_mensalidade?.toString() ?? '')
-  const [dia, setDia] = useState(plano?.dia_vencimento?.toString() ?? '10')
   const [descricao, setDescricao] = useState(plano?.descricao ?? '')
   const [ativo, setAtivo] = useState(plano?.ativo ?? true)
   const [erro, setErro] = useState('')
@@ -23,7 +22,7 @@ function ModalPlano({ plano, onClose }: { plano?: any; onClose: () => void }) {
       const dados = {
         nome_plano: nome,
         valor_mensalidade: parseFloat(valor),
-        dia_vencimento: parseInt(dia),
+        dia_vencimento: 10,   // sempre dia 10
         descricao: descricao || null,
         ativo,
       }
@@ -60,8 +59,8 @@ function ModalPlano({ plano, onClose }: { plano?: any; onClose: () => void }) {
               <input type="number" step="0.01" value={valor} onChange={e => setValor(e.target.value)} className={inputCls} placeholder="0,00" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Dia de Vencimento *</label>
-              <input type="number" min="1" max="28" value={dia} onChange={e => setDia(e.target.value)} className={inputCls} />
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Dia de Vencimento</label>
+              <input type="text" value="10 (fixo)" disabled className={`${inputCls} bg-slate-50 text-slate-400 cursor-not-allowed`} />
             </div>
           </div>
           <div>
@@ -166,7 +165,7 @@ export default function PlanosPage() {
 
               <div className="flex items-center gap-1.5 text-slate-500 text-xs">
                 <Calendar className="w-3.5 h-3.5" />
-                Vencimento todo dia {p.dia_vencimento}
+                Vencimento todo dia 10
               </div>
 
               <div className="flex items-center gap-2 pt-1 border-t border-slate-50">

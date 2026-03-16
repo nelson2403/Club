@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { mensalidadesApi } from '@/lib/api/mensalidades'
 import { formatarData, formatarMoeda, statusCorMensalidade, cn, referenciaParaLabel } from '@/lib/utils'
-import { Search, DollarSign, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Search, DollarSign, RefreshCw, CheckCircle, AlertTriangle, QrCode, ExternalLink, Copy, FileText, X } from 'lucide-react'
 import type { FormaPagamento } from '@/types/database'
 
+// ─── Modal de Pagamento Manual ───────────────────────────────
 function ModalPagamento({
   mensalidadeId, valor, onClose,
 }: {
@@ -91,12 +92,177 @@ function ModalPagamento({
   )
 }
 
+// ─── Modal de Boleto/PIX ─────────────────────────────────────
+interface CobrancaGerada {
+  asaas_id: string
+  pix_qrcode: string | null
+  pix_copia_cola: string | null
+  link_pagamento: string | null
+  boleto_url: string | null
+  ja_existia?: boolean
+}
+
+function ModalCobranca({
+  mensalidadeId, nomeSocio, onClose,
+}: {
+  mensalidadeId: string
+  nomeSocio: string
+  onClose: () => void
+}) {
+  const [cobranca, setCobranca] = useState<CobrancaGerada | null>(null)
+  const [carregando, setCarregando] = useState(false)
+  const [erro, setErro] = useState('')
+  const [copiado, setCopiado] = useState(false)
+
+  async function gerarCobranca() {
+    setCarregando(true)
+    setErro('')
+    try {
+      const res = await fetch('/api/admin/gerar-cobranca', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mensalidade_id: mensalidadeId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erro ao gerar cobrança')
+      setCobranca(json)
+    } catch (e: any) {
+      setErro(e.message)
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  function copiarPix() {
+    if (!cobranca?.pix_copia_cola) return
+    navigator.clipboard.writeText(cobranca.pix_copia_cola)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2000)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">Gerar Boleto / PIX</h2>
+          <button onClick={onClose} className="p-1 rounded-lg text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <p className="text-sm text-gray-500">{nomeSocio}</p>
+
+        {!cobranca && (
+          <div className="space-y-3">
+            {erro && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                {erro}
+              </div>
+            )}
+            <button
+              onClick={gerarCobranca}
+              disabled={carregando}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 text-sm font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {carregando ? (
+                <><RefreshCw className="w-4 h-4 animate-spin" /> Gerando cobrança...</>
+              ) : (
+                <><QrCode className="w-4 h-4" /> Gerar PIX + Boleto</>
+              )}
+            </button>
+          </div>
+        )}
+
+        {cobranca && (
+          <div className="space-y-4">
+            {cobranca.ja_existia && (
+              <div className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                Cobrança já existente — exibindo dados gerados anteriormente.
+              </div>
+            )}
+
+            {/* QR Code PIX */}
+            {cobranca.pix_qrcode && (
+              <div className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">QR Code PIX</p>
+                <img
+                  src={`data:image/png;base64,${cobranca.pix_qrcode}`}
+                  alt="QR Code PIX"
+                  className="w-40 h-40"
+                />
+              </div>
+            )}
+
+            {/* Copia e cola */}
+            {cobranca.pix_copia_cola && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">PIX Copia e Cola</p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={cobranca.pix_copia_cola}
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-700 truncate"
+                  />
+                  <button
+                    onClick={copiarPix}
+                    className={cn(
+                      'flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors border',
+                      copiado
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                    )}
+                  >
+                    {copiado ? <><CheckCircle className="w-3.5 h-3.5" /> Copiado!</> : <><Copy className="w-3.5 h-3.5" /> Copiar</>}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Links */}
+            <div className="flex gap-2">
+              {cobranca.link_pagamento && (
+                <a
+                  href={cobranca.link_pagamento}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Link de Pagamento
+                </a>
+              )}
+              {cobranca.boleto_url && (
+                <a
+                  href={cobranca.boleto_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5" /> Boleto PDF
+                </a>
+              )}
+            </div>
+
+            <button
+              onClick={onClose}
+              className="w-full border border-gray-300 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Página principal ─────────────────────────────────────────
 export default function MensalidadesPage() {
   const qc = useQueryClient()
   const [status, setStatus] = useState('')
   const [busca, setBusca] = useState('')
   const [page, setPage] = useState(1)
   const [modalPagamento, setModalPagamento] = useState<{ id: string; valor: number } | null>(null)
+  const [modalCobranca, setModalCobranca] = useState<{ id: string; nome: string } | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['mensalidades', 'list', { status, page }],
@@ -124,6 +290,13 @@ export default function MensalidadesPage() {
           mensalidadeId={modalPagamento.id}
           valor={modalPagamento.valor}
           onClose={() => setModalPagamento(null)}
+        />
+      )}
+      {modalCobranca && (
+        <ModalCobranca
+          mensalidadeId={modalCobranca.id}
+          nomeSocio={modalCobranca.nome}
+          onClose={() => setModalCobranca(null)}
         />
       )}
 
@@ -217,14 +390,26 @@ export default function MensalidadesPage() {
                   </td>
                   <td className="px-4 py-3">
                     {m.status !== 'pago' && m.status !== 'cancelado' && (
-                      <button
-                        onClick={() => setModalPagamento({ id: m.id, valor: m.valor })}
-                        className="flex items-center gap-1.5 text-xs font-medium text-green-600
-                                   hover:text-green-800 transition-colors"
-                      >
-                        <DollarSign className="w-3.5 h-3.5" />
-                        Pagar
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setModalPagamento({ id: m.id, valor: m.valor })}
+                          className="flex items-center gap-1 text-xs font-medium text-green-600
+                                     hover:text-green-800 transition-colors"
+                          title="Registrar pagamento manual"
+                        >
+                          <DollarSign className="w-3.5 h-3.5" />
+                          Pagar
+                        </button>
+                        <button
+                          onClick={() => setModalCobranca({ id: m.id, nome: m.socios?.nome ?? '' })}
+                          className="flex items-center gap-1 text-xs font-medium text-blue-600
+                                     hover:text-blue-800 transition-colors"
+                          title="Gerar boleto / PIX Asaas"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          Boleto/PIX
+                        </button>
+                      </div>
                     )}
                     {m.status === 'pago' && (
                       <CheckCircle className="w-4 h-4 text-green-500" />

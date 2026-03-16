@@ -322,7 +322,7 @@ export default function NovoSocioPage() {
             <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-blue-900">{planoEscolhido.nome_plano}</p>
-                <p className="text-xs text-blue-500 mt-0.5">Vencimento todo dia {planoEscolhido.dia_vencimento}</p>
+                <p className="text-xs text-blue-500 mt-0.5">Vencimento todo dia 10</p>
               </div>
               <p className="text-xl font-bold text-blue-700">
                 R$ {planoEscolhido.valor_mensalidade.toFixed(2)}
