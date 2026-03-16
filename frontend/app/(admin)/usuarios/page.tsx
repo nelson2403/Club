@@ -296,13 +296,13 @@ export default function UsuariosPage() {
   const { data: isAdmin } = useQuery({
     queryKey: ['usuario-tipo'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return false
-      // Tenta por ID primeiro, depois por email (caso IDs não batam)
-      const { data: porId } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).maybeSingle()
-      if (porId) return porId.tipo_usuario === 'master'
-      const { data: porEmail } = await supabase.from('usuarios').select('tipo_usuario').eq('email', user.email).maybeSingle()
-      return porEmail?.tipo_usuario === 'master'
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return false
+      const res = await fetch('/api/me/role', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const json = await res.json()
+      return json.role === 'master'
     },
   })
 
