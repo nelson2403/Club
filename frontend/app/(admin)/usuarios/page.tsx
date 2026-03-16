@@ -388,7 +388,7 @@ export default function UsuariosPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Cadastro</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-              <th className="px-4 py-3" />
+              <th className="px-4 py-3 w-36" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -397,7 +397,7 @@ export default function UsuariosPage() {
             ) : (usuarios ?? []).map((u) => (
               <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-3 font-medium text-gray-900">{u.nome}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{u.email}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs max-w-[180px] truncate">{u.email}</td>
                 <td className="px-4 py-3">
                   <span className={cn('px-2 py-1 rounded-full text-xs font-medium', tipoCor[u.tipo_usuario] ?? 'bg-gray-100 text-gray-600')}>
                     {tipoLabel[u.tipo_usuario] ?? u.tipo_usuario}
@@ -413,7 +413,7 @@ export default function UsuariosPage() {
                     {u.ativo ? 'Ativo' : 'Inativo'}
                   </span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 w-36 whitespace-nowrap">
                   <div className="flex items-center gap-1 justify-end">
                     <button
                       onClick={() => setModalSenha(u)}
