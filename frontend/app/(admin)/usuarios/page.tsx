@@ -265,7 +265,7 @@ export default function UsuariosPage() {
   const [confirmExcluir, setConfirmExcluir] = useState<Usuario | null>(null)
 
   const { data: isAdmin } = useQuery({
-    queryKey: ['usuario-tipo'],
+    queryKey: ['usuario-tipo-usuarios-page'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return false
