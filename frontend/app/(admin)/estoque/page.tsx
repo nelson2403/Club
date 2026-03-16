@@ -4,8 +4,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { produtosApi } from '@/lib/api/produtos'
 import { formatarMoeda, cn } from '@/lib/utils'
-import { Plus, Package, AlertTriangle, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react'
+import { Plus, Package, AlertTriangle, ArrowUp, ArrowDown, RotateCcw, Trash2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import type { TipoMovimentacao } from '@/types/database'
+
+const supabase = createClient()
 
 function ModalMovimentacao({
   produtoId, nomeProduto, onClose,
@@ -110,8 +113,29 @@ function ModalMovimentacao({
 }
 
 export default function EstoquePage() {
+  const qc = useQueryClient()
   const [filtro, setFiltro] = useState('')
   const [modalProduto, setModalProduto] = useState<{ id: string; nome: string } | null>(null)
+  const [confirmExcluir, setConfirmExcluir] = useState<{ id: string; nome: string } | null>(null)
+
+  const { data: isAdmin } = useQuery({
+    queryKey: ['usuario-tipo'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return false
+      const { data } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).single()
+      return data?.tipo_usuario === 'admin'
+    },
+  })
+
+  const { mutate: excluir, isPending: excluindo } = useMutation({
+    mutationFn: (id: string) => produtosApi.excluir(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['produtos'] })
+      setConfirmExcluir(null)
+    },
+    onError: (e: Error) => alert('Erro ao excluir: ' + e.message),
+  })
 
   const { data: produtos, isLoading } = useQuery({
     queryKey: ['produtos', 'estoque', filtro],
@@ -123,6 +147,35 @@ export default function EstoquePage() {
 
   return (
     <div className="space-y-5">
+      {confirmExcluir && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-bold text-gray-900">Excluir produto?</p>
+                <p className="text-sm text-gray-500">{confirmExcluir.nome}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600">
+              O produto será removido permanentemente. Produtos com vendas registradas não podem ser excluídos.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmExcluir(null)}
+                className="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={() => excluir(confirmExcluir.id)} disabled={excluindo}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60">
+                {excluindo ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalProduto && (
         <ModalMovimentacao
           produtoId={modalProduto.id}
@@ -194,13 +247,24 @@ export default function EstoquePage() {
                     </td>
                     <td className="px-4 py-3 text-right text-gray-400">{p.estoque_minimo}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => setModalProduto({ id: p.id, nome: p.nome })}
-                        className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
-                      >
-                        <Package className="w-3.5 h-3.5" />
-                        Movimentar
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setModalProduto({ id: p.id, nome: p.nome })}
+                          className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                        >
+                          <Package className="w-3.5 h-3.5" />
+                          Movimentar
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => setConfirmExcluir({ id: p.id, nome: p.nome })}
+                            className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Excluir produto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

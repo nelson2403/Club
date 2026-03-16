@@ -93,6 +93,15 @@ export const sociosApi = {
     return data
   },
 
+  excluir: async (id: string) => {
+    const { error } = await supabase
+      .from('socios')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  },
+
   atribuirPlano: async (socio_id: string, plano_id: string) => {
     // Desativar plano atual
     await supabase

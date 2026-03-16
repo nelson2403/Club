@@ -80,6 +80,15 @@ export const produtosApi = {
     return data
   },
 
+  excluir: async (id: string) => {
+    const { error } = await supabase
+      .from('produtos')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  },
+
   movimentarEstoque: async (
     produto_id: string,
     tipo: TipoMovimentacao,

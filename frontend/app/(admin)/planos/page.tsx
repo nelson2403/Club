@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { formatarMoeda, cn } from '@/lib/utils'
-import { Plus, Edit2, X, Calendar, DollarSign, CheckCircle, XCircle, ClipboardList } from 'lucide-react'
+import { Plus, Edit2, X, Calendar, DollarSign, CheckCircle, XCircle, ClipboardList, Trash2 } from 'lucide-react'
 
 const supabase = createClient()
 
@@ -95,6 +95,29 @@ function ModalPlano({ plano, onClose }: { plano?: any; onClose: () => void }) {
 export default function PlanosPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState<any>(null)
+  const [confirmExcluir, setConfirmExcluir] = useState<{ id: string; nome: string } | null>(null)
+
+  const { data: isAdmin } = useQuery({
+    queryKey: ['usuario-tipo'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return false
+      const { data } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).single()
+      return data?.tipo_usuario === 'admin'
+    },
+  })
+
+  const { mutate: excluir, isPending: excluindo } = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('planos').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['planos'] })
+      setConfirmExcluir(null)
+    },
+    onError: (e: Error) => alert('Erro ao excluir: ' + e.message),
+  })
 
   const { data: planos, isLoading } = useQuery({
     queryKey: ['planos'],
@@ -118,6 +141,35 @@ export default function PlanosPage() {
 
   return (
     <div className="space-y-5 max-w-4xl">
+      {confirmExcluir && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-900">Excluir plano?</p>
+                <p className="text-sm text-slate-500">{confirmExcluir.nome}</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600">
+              O plano será removido permanentemente. Planos com sócios vinculados não podem ser excluídos.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmExcluir(null)}
+                className="flex-1 border border-slate-300 rounded-xl py-2.5 text-sm text-slate-600 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={() => excluir(confirmExcluir.id)} disabled={excluindo}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60">
+                {excluindo ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal !== null && <ModalPlano plano={modal === 'novo' ? undefined : modal} onClose={() => setModal(null)} />}
 
       <div className="flex items-center justify-between">
@@ -177,6 +229,13 @@ export default function PlanosPage() {
                   className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors ml-auto">
                   {p.ativo ? <><XCircle className="w-3.5 h-3.5" /> Desativar</> : <><CheckCircle className="w-3.5 h-3.5" /> Ativar</>}
                 </button>
+                {isAdmin && (
+                  <button onClick={() => setConfirmExcluir({ id: p.id, nome: p.nome_plano })}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Excluir plano">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

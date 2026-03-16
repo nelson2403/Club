@@ -1,19 +1,43 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sociosApi } from '@/lib/api/socios'
 import { formatarData, formatarCPF, formatarTelefone, cn, statusCorSocio } from '@/lib/utils'
-import { Search, Plus, Eye, Edit2, UserX, UserCheck } from 'lucide-react'
+import { Search, Plus, Eye, Edit2, UserX, UserCheck, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useAlterarStatusSocio } from '@/hooks/useSocios'
+import { createClient } from '@/lib/supabase/client'
 import type { StatusSocio } from '@/types/database'
 
+const supabase = createClient()
+
 export default function SociosPage() {
+  const qc = useQueryClient()
   const [busca, setBusca] = useState('')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
+  const [confirmExcluir, setConfirmExcluir] = useState<{ id: string; nome: string } | null>(null)
   const { mutate: alterarStatus } = useAlterarStatusSocio()
+
+  const { data: isAdmin } = useQuery({
+    queryKey: ['usuario-tipo'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return false
+      const { data } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).single()
+      return data?.tipo_usuario === 'admin'
+    },
+  })
+
+  const { mutate: excluir, isPending: excluindo } = useMutation({
+    mutationFn: (id: string) => sociosApi.excluir(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['socios'] })
+      setConfirmExcluir(null)
+    },
+    onError: (e: Error) => alert('Erro ao excluir: ' + e.message),
+  })
 
   const { data, isLoading } = useQuery({
     queryKey: ['socios', 'list', { busca, status, page }],
@@ -26,6 +50,36 @@ export default function SociosPage() {
 
   return (
     <div className="space-y-5">
+      {/* Modal confirmação excluir */}
+      {confirmExcluir && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-bold text-gray-900">Excluir sócio?</p>
+                <p className="text-sm text-gray-500">{confirmExcluir.nome}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600">
+              Todos os dados do sócio (mensalidades, histórico) serão removidos permanentemente.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmExcluir(null)}
+                className="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={() => excluir(confirmExcluir.id)} disabled={excluindo}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60">
+                {excluindo ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -149,6 +203,15 @@ export default function SociosPage() {
                             : <UserCheck className="w-4 h-4" />
                           }
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => setConfirmExcluir({ id: socio.id, nome: socio.nome })}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Excluir sócio"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
