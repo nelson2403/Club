@@ -294,13 +294,13 @@ export default function UsuariosPage() {
   })
 
   const { data: isAdmin } = useQuery({
-    queryKey: ['meu-role'],
+    queryKey: ['usuario-tipo'],
     queryFn: async () => {
-      const res = await fetch('/api/me/role')
-      const json = await res.json()
-      return json.role === 'master'
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return false
+      const { data } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).single()
+      return data?.tipo_usuario === 'master'
     },
-    staleTime: Infinity,
   })
 
   const { mutate: alterarAtivo } = useMutation({
