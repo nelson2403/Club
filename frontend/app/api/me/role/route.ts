@@ -12,11 +12,19 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ role: null })
 
-  const { data } = await supabaseAdmin
+  const { data: porId } = await supabaseAdmin
     .from('usuarios')
     .select('tipo_usuario')
     .eq('id', user.id)
     .maybeSingle()
 
-  return NextResponse.json({ role: data?.tipo_usuario ?? null })
+  if (porId) return NextResponse.json({ role: porId.tipo_usuario })
+
+  const { data: porEmail } = await supabaseAdmin
+    .from('usuarios')
+    .select('tipo_usuario')
+    .eq('email', user.email)
+    .maybeSingle()
+
+  return NextResponse.json({ role: porEmail?.tipo_usuario ?? null })
 }

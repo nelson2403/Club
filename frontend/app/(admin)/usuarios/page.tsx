@@ -298,8 +298,11 @@ export default function UsuariosPage() {
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return false
-      const { data } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).single()
-      return data?.tipo_usuario === 'master'
+      // Tenta por ID primeiro, depois por email (caso IDs não batam)
+      const { data: porId } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).maybeSingle()
+      if (porId) return porId.tipo_usuario === 'master'
+      const { data: porEmail } = await supabase.from('usuarios').select('tipo_usuario').eq('email', user.email).maybeSingle()
+      return porEmail?.tipo_usuario === 'master'
     },
   })
 
