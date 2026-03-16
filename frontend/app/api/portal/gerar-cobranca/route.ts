@@ -72,7 +72,10 @@ export async function POST(req: NextRequest) {
       mensalidade: {
         id: mensalidade.id,
         valor: mensalidade.valor,
-        data_vencimento: mensalidade.data_vencimento,
+        // Asaas não aceita data no passado — usar hoje se já venceu
+        data_vencimento: mensalidade.data_vencimento < new Date().toISOString().split('T')[0]
+          ? new Date().toISOString().split('T')[0]
+          : mensalidade.data_vencimento,
         referencia_mes: mensalidade.referencia_mes,
       },
     })
