@@ -103,7 +103,7 @@ export default function PlanosPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return false
       const { data } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).single()
-      return data?.tipo_usuario === 'admin'
+      return data?.tipo_usuario === 'master'
     },
   })
 
