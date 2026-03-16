@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useQuery } from '@tanstack/react-query'
@@ -22,7 +22,7 @@ function formatarTelefone(v: string) {
   return d.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
 }
 
-export default function CadastroPublicoPage() {
+function CadastroPublicoInner() {
   const params = useSearchParams()
   const planoParam = params.get('plano') ?? ''
 
@@ -208,5 +208,13 @@ export default function CadastroPublicoPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function CadastroPublicoPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" />}>
+      <CadastroPublicoInner />
+    </Suspense>
   )
 }
