@@ -294,16 +294,11 @@ export default function UsuariosPage() {
   })
 
   const { data: isAdmin } = useQuery({
-    queryKey: ['eu-sou-master'],
+    queryKey: ['meu-role'],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) return false
-      const { data } = await supabase
-        .from('usuarios')
-        .select('tipo_usuario')
-        .eq('id', session.user.id)
-        .maybeSingle()
-      return data?.tipo_usuario === 'master'
+      const res = await fetch('/api/me/role')
+      const json = await res.json()
+      return json.role === 'master'
     },
     staleTime: Infinity,
   })
