@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { formatarData, cn } from '@/lib/utils'
@@ -264,11 +264,6 @@ export default function UsuariosPage() {
   const [modalSenha, setModalSenha] = useState<Usuario | null>(null)
   const [confirmExcluir, setConfirmExcluir] = useState<Usuario | null>(null)
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id ?? null))
-  }, [])
-
   const { mutate: excluirUsuario, isPending: excluindo } = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch('/api/usuarios/excluir', {
@@ -298,10 +293,20 @@ export default function UsuariosPage() {
     },
   })
 
-  // isAdmin: deriva direto da lista já carregada
-  const isAdmin = currentUserId
-    ? (usuarios ?? []).find((u: any) => u.id === currentUserId)?.tipo_usuario === 'master'
-    : false
+  const { data: isAdmin } = useQuery({
+    queryKey: ['eu-sou-master'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return false
+      const { data } = await supabase
+        .from('usuarios')
+        .select('tipo_usuario')
+        .eq('id', session.user.id)
+        .maybeSingle()
+      return data?.tipo_usuario === 'master'
+    },
+    staleTime: Infinity,
+  })
 
   const { mutate: alterarAtivo } = useMutation({
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
