@@ -293,18 +293,6 @@ export default function UsuariosPage() {
     },
   })
 
-  const { data: isAdmin } = useQuery({
-    queryKey: ['usuario-tipo'],
-    queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) return false
-      const res = await fetch('/api/me/role', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const json = await res.json()
-      return json.role === 'master'
-    },
-  })
 
   const { mutate: alterarAtivo } = useMutation({
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
@@ -448,15 +436,13 @@ export default function UsuariosPage() {
                     >
                       {u.ativo ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                     </button>
-                    {isAdmin && (
-                      <button
-                        onClick={() => setConfirmExcluir(u)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Excluir usuário"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setConfirmExcluir(u)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Excluir usuário"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </td>
               </tr>
