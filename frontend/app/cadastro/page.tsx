@@ -154,41 +154,33 @@ function CadastroPublicoInner() {
             </div>
           </div>
 
-          {/* Planos */}
-          {(planos ?? []).length > 0 && (
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
-                <CreditCard className="w-3.5 h-3.5" /> Plano de mensalidade
-              </label>
+          {/* Plano pré-selecionado */}
+          {planoParam && planoId && (() => {
+            const plano = (planos ?? []).find((p: any) => p.id === planoId)
+            if (!plano) return null
+            return (
               <div className="space-y-2">
-                {(planos ?? []).map((p: any) => (
-                  <label key={p.id} className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-colors ${
-                    planoId === p.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <input type="radio" name="plano" value={p.id} checked={planoId === p.id}
-                        onChange={() => setPlanoId(p.id)} className="accent-blue-600" />
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">{p.nome_plano}</p>
-                        {p.descricao && <p className="text-xs text-slate-400">{p.descricao}</p>}
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold text-blue-600">
-                      R$ {Number(p.valor_mensalidade).toFixed(2)}
-                      <span className="text-xs font-normal text-slate-400">/mês</span>
-                    </span>
-                  </label>
-                ))}
-                <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
-                  planoId === '' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
-                }`}>
-                  <input type="radio" name="plano" value="" checked={planoId === ''}
-                    onChange={() => setPlanoId('')} className="accent-slate-500" />
-                  <p className="text-sm text-slate-500">Decidir depois</p>
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5" /> Plano de mensalidade
                 </label>
+                <div className="flex items-center justify-between p-3 rounded-xl border-2 border-blue-500 bg-blue-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 rounded-full border-2 border-blue-600 bg-blue-600 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{plano.nome_plano}</p>
+                      {plano.descricao && <p className="text-xs text-slate-400">{plano.descricao}</p>}
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-blue-600">
+                    R$ {Number(plano.valor_mensalidade).toFixed(2)}
+                    <span className="text-xs font-normal text-slate-400">/mês</span>
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {erro && (
             <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">
