@@ -348,7 +348,7 @@ export default function UsuariosPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Usuários do Sistema</h1>
+          <h1 className="text-xl font-bold text-gray-900">Usuários do Sistema ✓</h1>
           <p className="text-sm text-gray-500">{usuarios?.length ?? 0} usuários cadastrados</p>
         </div>
         <button
