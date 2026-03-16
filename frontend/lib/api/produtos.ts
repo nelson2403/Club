@@ -81,11 +81,24 @@ export const produtosApi = {
   },
 
   excluir: async (id: string) => {
-    const { error } = await supabase
-      .from('produtos')
-      .delete()
-      .eq('id', id)
+    // Verificar se há vendas registradas (não pode excluir)
+    const { count } = await supabase
+      .from('itens_venda')
+      .select('id', { count: 'exact', head: true })
+      .eq('produto_id', id)
 
+    if ((count ?? 0) > 0) {
+      throw new Error('Produto possui vendas registradas e não pode ser excluído.')
+    }
+
+    // Remover movimentações de estoque
+    await supabase.from('movimentacoes_estoque').delete().eq('produto_id', id)
+
+    // Remover registro de estoque
+    await supabase.from('estoque').delete().eq('produto_id', id)
+
+    // Excluir produto
+    const { error } = await supabase.from('produtos').delete().eq('id', id)
     if (error) throw error
   },
 
