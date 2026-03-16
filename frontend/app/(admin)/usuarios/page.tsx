@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { formatarData, cn } from '@/lib/utils'
-import { Plus, Edit2, UserX, UserCheck, Key, X, Check, Eye, EyeOff } from 'lucide-react'
+import { Plus, Edit2, UserX, UserCheck, Key, X, Check, Eye, EyeOff, Trash2 } from 'lucide-react'
 import type { TipoUsuario, Usuario } from '@/types/database'
 
 const supabase = createClient()
@@ -262,6 +262,34 @@ export default function UsuariosPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState<'novo' | Usuario | null>(null)
   const [modalSenha, setModalSenha] = useState<Usuario | null>(null)
+  const [confirmExcluir, setConfirmExcluir] = useState<Usuario | null>(null)
+
+  const { data: isAdmin } = useQuery({
+    queryKey: ['usuario-tipo'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return false
+      const { data } = await supabase.from('usuarios').select('tipo_usuario').eq('id', user.id).single()
+      return data?.tipo_usuario === 'master'
+    },
+  })
+
+  const { mutate: excluirUsuario, isPending: excluindo } = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch('/api/usuarios/excluir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erro ao excluir')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['usuarios'] })
+      setConfirmExcluir(null)
+    },
+    onError: (e: Error) => alert('Erro ao excluir: ' + e.message),
+  })
 
   const { data: usuarios, isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -285,6 +313,35 @@ export default function UsuariosPage() {
 
   return (
     <div className="space-y-5 max-w-3xl">
+      {confirmExcluir && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-bold text-gray-900">Excluir usuário?</p>
+                <p className="text-sm text-gray-500">{confirmExcluir.nome}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600">
+              O usuário perderá o acesso ao sistema permanentemente.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmExcluir(null)}
+                className="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={() => excluirUsuario(confirmExcluir.id)} disabled={excluindo}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60">
+                {excluindo ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal && (
         <ModalUsuario
           usuario={modal === 'novo' ? undefined : modal}
@@ -388,6 +445,15 @@ export default function UsuariosPage() {
                     >
                       {u.ativo ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                     </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setConfirmExcluir(u)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Excluir usuário"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
