@@ -10,7 +10,7 @@ import {
 import {
   ArrowLeft, Edit2, Phone, Mail, MapPin, Calendar,
   CreditCard, CheckCircle, AlertTriangle, Clock,
-  DollarSign, ShoppingBag, User, BadgeCheck, Send, Copy, ExternalLink
+  DollarSign, ShoppingBag, User, BadgeCheck, Send, Copy, ExternalLink, RefreshCw, X
 } from 'lucide-react'
 import Link from 'next/link'
 import type { FormaPagamento, StatusMensalidade } from '@/types/database'
@@ -111,12 +111,119 @@ function StatusBadge({ status }: { status: StatusMensalidade }) {
 }
 
 // ============================================================
+// Modal alterar plano
+// ============================================================
+function ModalAlterarPlano({
+  socioId,
+  planoAtivoId,
+  onClose,
+}: {
+  socioId: string
+  planoAtivoId: string | undefined
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [novoPlanoId, setNovoPlanoId] = useState(planoAtivoId ?? '')
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const { data: planos } = useQuery({
+    queryKey: ['planos'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('planos')
+        .select('id, nome_plano, valor_mensalidade')
+        .eq('ativo', true)
+        .order('valor_mensalidade')
+      return data ?? []
+    },
+  })
+
+  async function salvar() {
+    setSalvando(true)
+    setErro('')
+    try {
+      // Encerrar plano atual
+      await supabase
+        .from('socios_planos')
+        .update({ status: 'encerrado', data_fim: new Date().toISOString().split('T')[0] })
+        .eq('socio_id', socioId)
+        .eq('status', 'ativo')
+
+      // Vincular novo plano
+      if (novoPlanoId) {
+        const { error } = await supabase.from('socios_planos').insert({
+          socio_id: socioId,
+          plano_id: novoPlanoId,
+          data_inicio: new Date().toISOString().split('T')[0],
+          status: 'ativo',
+        })
+        if (error) throw error
+      }
+
+      qc.invalidateQueries({ queryKey: ['socio', socioId] })
+      onClose()
+    } catch (e: any) {
+      setErro(e.message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-blue-600" />
+            Alterar Plano
+          </h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Novo Plano</label>
+          <select
+            value={novoPlanoId}
+            onChange={(e) => setNovoPlanoId(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Sem plano</option>
+            {(planos ?? []).map((p: any) => (
+              <option key={p.id} value={p.id}>
+                {p.nome_plano} — R$ {Number(p.valor_mensalidade).toFixed(2)}/mês
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {erro && <p className="text-xs text-red-500">{erro}</p>}
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose}
+            className="flex-1 border border-gray-300 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button onClick={salvar} disabled={salvando}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-60">
+            {salvando ? 'Salvando...' : 'Confirmar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
 // Página principal
 // ============================================================
 export default function SocioPerfilPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [filtroParcelas, setFiltroParcelas] = useState<string>('todas')
   const [modalPagamento, setModalPagamento] = useState<{ id: string; valor: number; referencia: number } | null>(null)
+  const [modalAlterarPlano, setModalAlterarPlano] = useState(false)
   const [enviandoLink, setEnviandoLink] = useState(false)
   const [linkEnviado, setLinkEnviado] = useState(false)
   const [erroEnvio, setErroEnvio] = useState('')
@@ -231,6 +338,14 @@ export default function SocioPerfilPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-6 max-w-5xl">
+      {modalAlterarPlano && (
+        <ModalAlterarPlano
+          socioId={id}
+          planoAtivoId={planoAtivo?.planos?.id}
+          onClose={() => setModalAlterarPlano(false)}
+        />
+      )}
+
       {modalPagamento && (
         <ModalPagamento
           mensalidadeId={modalPagamento.id}
@@ -358,22 +473,35 @@ export default function SocioPerfilPage({ params }: { params: Promise<{ id: stri
           </div>
 
           {/* Plano atual */}
-          {planoAtivo && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Plano Ativo</p>
-              <p className="font-bold text-blue-900">{planoAtivo.planos?.nome_plano}</p>
-              <p className="text-xl font-bold text-blue-700 mt-1">
-                {formatarMoeda(planoAtivo.planos?.valor_mensalidade)}
-                <span className="text-sm font-normal text-blue-500">/mês</span>
-              </p>
-              <p className="text-xs text-blue-500 mt-1">
-                Vencimento todo dia {planoAtivo.planos?.dia_vencimento}
-              </p>
-              <p className="text-xs text-blue-400 mt-1">
-                Desde {formatarData(planoAtivo.data_inicio)}
-              </p>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Plano Ativo</p>
+              <button
+                onClick={() => setModalAlterarPlano(true)}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Alterar
+              </button>
             </div>
-          )}
+            {planoAtivo ? (
+              <>
+                <p className="font-bold text-blue-900">{planoAtivo.planos?.nome_plano}</p>
+                <p className="text-xl font-bold text-blue-700 mt-1">
+                  {formatarMoeda(planoAtivo.planos?.valor_mensalidade)}
+                  <span className="text-sm font-normal text-blue-500">/mês</span>
+                </p>
+                <p className="text-xs text-blue-500 mt-1">
+                  Vencimento todo dia {planoAtivo.planos?.dia_vencimento}
+                </p>
+                <p className="text-xs text-blue-400 mt-1">
+                  Desde {formatarData(planoAtivo.data_inicio)}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-blue-400 italic">Nenhum plano vinculado</p>
+            )}
+          </div>
 
           {/* Resumo financeiro */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">

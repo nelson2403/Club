@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sociosApi } from '@/lib/api/socios'
 import { formatarData, formatarCPF, formatarTelefone, cn, statusCorSocio } from '@/lib/utils'
-import { Search, Plus, Eye, Edit2, UserX, UserCheck, Trash2, Send, Bell } from 'lucide-react'
+import { Search, Plus, Eye, Edit2, UserX, UserCheck, Trash2, Send, Bell, Link2, X } from 'lucide-react'
 import Link from 'next/link'
 import { useAlterarStatusSocio } from '@/hooks/useSocios'
 import { createClient } from '@/lib/supabase/client'
@@ -18,7 +18,37 @@ export default function SociosPage() {
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
   const [confirmExcluir, setConfirmExcluir] = useState<{ id: string; nome: string } | null>(null)
+  const [modalLink, setModalLink] = useState(false)
+  const [planoLink, setPlanoLink] = useState('')
+  const [linkCopiado, setLinkCopiado] = useState(false)
   const { mutate: alterarStatus } = useAlterarStatusSocio()
+
+  const { data: planos } = useQuery({
+    queryKey: ['planos-lista'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('planos')
+        .select('id, nome_plano, valor_mensalidade')
+        .eq('ativo', true)
+        .order('valor_mensalidade')
+      return data ?? []
+    },
+  })
+
+  function copiarLinkCadastro() {
+    const base = `${window.location.origin}/cadastro`
+    const url = planoLink ? `${base}?plano=${planoLink}` : base
+    navigator.clipboard.writeText(url).catch(() => {
+      const el = document.createElement('textarea')
+      el.value = url
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    })
+    setLinkCopiado(true)
+    setTimeout(() => setLinkCopiado(false), 2000)
+  }
 
   const { data: isAdmin } = useQuery({
     queryKey: ['usuario-tipo'],
@@ -68,6 +98,54 @@ export default function SociosPage() {
 
   return (
     <div className="space-y-5">
+      {/* Modal copiar link de cadastro */}
+      {modalLink && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="font-bold text-gray-900 flex items-center gap-2">
+                <Link2 className="w-4 h-4 text-blue-600" />
+                Link de Cadastro
+              </p>
+              <button onClick={() => setModalLink(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500">
+              Envie este link para o sócio se cadastrar. Você pode pré-selecionar um plano.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Plano pré-selecionado (opcional)</label>
+              <select
+                value={planoLink}
+                onChange={(e) => setPlanoLink(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sem plano pré-definido</option>
+                {(planos ?? []).map((p: any) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome_plano} — R$ {Number(p.valor_mensalidade).toFixed(2)}/mês
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="bg-slate-50 rounded-lg px-3 py-2 text-xs text-slate-500 font-mono break-all">
+              {`${typeof window !== 'undefined' ? window.location.origin : ''}/cadastro`}
+              {planoLink ? `?plano=${planoLink}` : ''}
+            </div>
+            <button
+              onClick={copiarLinkCadastro}
+              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                linkCopiado ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              <Link2 className="w-4 h-4" />
+              {linkCopiado ? 'Link copiado!' : 'Copiar Link'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal confirmação excluir */}
       {confirmExcluir && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -129,6 +207,15 @@ export default function SociosPage() {
               </button>
             </>
           )}
+          <button
+            onClick={() => { setModalLink(true); setLinkCopiado(false) }}
+            className="flex items-center gap-2 border border-gray-300 text-gray-600 hover:bg-gray-50
+                       text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+            title="Copiar link de auto-cadastro para enviar ao sócio"
+          >
+            <Link2 className="w-4 h-4" />
+            Link Cadastro
+          </button>
           <Link
             href="/socios/novo"
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white
