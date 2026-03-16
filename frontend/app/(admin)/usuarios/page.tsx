@@ -348,7 +348,7 @@ export default function UsuariosPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Usuários do Sistema ✓</h1>
+          <h1 className="text-xl font-bold text-gray-900">Usuários do Sistema</h1>
           <p className="text-sm text-gray-500">{usuarios?.length ?? 0} usuários cadastrados</p>
         </div>
         <button
@@ -388,7 +388,7 @@ export default function UsuariosPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Cadastro</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-              <th className="px-4 py-3 w-36" />
+              <th className="px-4 py-3 w-48" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -413,7 +413,7 @@ export default function UsuariosPage() {
                     {u.ativo ? 'Ativo' : 'Inativo'}
                   </span>
                 </td>
-                <td className="px-4 py-3 w-36 whitespace-nowrap">
+                <td className="px-4 py-3 w-48 whitespace-nowrap">
                   <div className="flex items-center gap-1 justify-end">
                     <button
                       onClick={() => setModalSenha(u)}
