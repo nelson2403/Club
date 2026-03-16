@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sociosApi } from '@/lib/api/socios'
 import { formatarData, formatarCPF, formatarTelefone, cn, statusCorSocio } from '@/lib/utils'
-import { Search, Plus, Eye, Edit2, UserX, UserCheck, Trash2 } from 'lucide-react'
+import { Search, Plus, Eye, Edit2, UserX, UserCheck, Trash2, Send, Bell } from 'lucide-react'
 import Link from 'next/link'
 import { useAlterarStatusSocio } from '@/hooks/useSocios'
 import { createClient } from '@/lib/supabase/client'
@@ -38,6 +38,24 @@ export default function SociosPage() {
     },
     onError: (e: Error) => alert('Erro ao excluir: ' + e.message),
   })
+
+  const [envioStatus, setEnvioStatus] = useState<string | null>(null)
+
+  async function dispararEnvio(tipo: 'mensal' | 'lembrete') {
+    setEnvioStatus('enviando')
+    try {
+      const { data, error } = await supabase.functions.invoke('enviar-cobrancas', {
+        body: { tipo },
+      })
+      if (error) throw error
+      const msg = tipo === 'mensal'
+        ? `Faturas enviadas: ${data?.enviados ?? 0} | Sem telefone: ${data?.sem_telefone ?? 0} | Erros: ${data?.erros ?? 0}`
+        : `Lembretes enviados: ${data?.enviados ?? 0} | Sem telefone: ${data?.sem_telefone ?? 0} | Erros: ${data?.erros ?? 0}`
+      setEnvioStatus(msg)
+    } catch (e: any) {
+      setEnvioStatus('Erro: ' + e.message)
+    }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['socios', 'list', { busca, status, page }],
@@ -86,15 +104,56 @@ export default function SociosPage() {
           <h1 className="text-xl font-bold text-gray-900">Sócios</h1>
           <p className="text-sm text-gray-500">{total} sócios cadastrados</p>
         </div>
-        <Link
-          href="/socios/novo"
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white
-                     text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Sócio
-        </Link>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => dispararEnvio('mensal')}
+                disabled={envioStatus === 'enviando'}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white
+                           text-sm font-medium px-3 py-2 rounded-lg transition-colors disabled:opacity-60"
+                title="Gera cobrança Asaas e envia WhatsApp para todos os sócios com mensalidade pendente do mês"
+              >
+                <Send className="w-4 h-4" />
+                Enviar Fatura do Mês
+              </button>
+              <button
+                onClick={() => dispararEnvio('lembrete')}
+                disabled={envioStatus === 'enviando'}
+                className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white
+                           text-sm font-medium px-3 py-2 rounded-lg transition-colors disabled:opacity-60"
+                title="Envia lembrete de vencimento amanhã para sócios com mensalidade pendente"
+              >
+                <Bell className="w-4 h-4" />
+                Lembrete de Vencimento
+              </button>
+            </>
+          )}
+          <Link
+            href="/socios/novo"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white
+                       text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Sócio
+          </Link>
+        </div>
       </div>
+
+      {/* Resultado do envio */}
+      {envioStatus && envioStatus !== 'enviando' && (
+        <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
+          <span>{envioStatus}</span>
+          <button onClick={() => setEnvioStatus(null)} className="text-green-600 hover:text-green-800 font-medium text-xs">
+            Fechar
+          </button>
+        </div>
+      )}
+      {envioStatus === 'enviando' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
+          <Send className="w-4 h-4 animate-pulse" /> Enviando mensagens... aguarde.
+        </div>
+      )}
 
       {/* Filtros */}
       <div className="flex gap-3">
