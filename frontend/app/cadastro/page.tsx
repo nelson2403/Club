@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useQuery } from '@tanstack/react-query'
-import { CheckCircle, User, Phone, Mail, CreditCard, ChevronRight } from 'lucide-react'
+import { CheckCircle, User, Phone, Mail, CreditCard, ChevronRight, Plus, Trash2, Users, AlertCircle } from 'lucide-react'
 
 const supabase = createClient()
 
@@ -22,6 +22,24 @@ function formatarTelefone(v: string) {
   return d.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
 }
 
+function calcularIdade(dataNasc: string): number | null {
+  if (!dataNasc) return null
+  const hoje = new Date()
+  const nasc = new Date(dataNasc)
+  let idade = hoje.getFullYear() - nasc.getFullYear()
+  const m = hoje.getMonth() - nasc.getMonth()
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--
+  return idade
+}
+
+interface Dependente {
+  nome: string
+  cpf: string
+  data_nascimento: string
+}
+
+const depVazio: Dependente = { nome: '', cpf: '', data_nascimento: '' }
+
 function CadastroPublicoInner() {
   const params = useSearchParams()
   const planoParam = params.get('plano') ?? ''
@@ -32,6 +50,7 @@ function CadastroPublicoInner() {
   const [email, setEmail] = useState('')
   const [dataNasc, setDataNasc] = useState('')
   const [planoId, setPlanoId] = useState(planoParam)
+  const [dependentes, setDependentes] = useState<Dependente[]>([])
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState(false)
@@ -48,12 +67,26 @@ function CadastroPublicoInner() {
     },
   })
 
-  // Pré-selecionar plano da URL assim que os planos carregarem
   useEffect(() => {
     if (planoParam && planos?.find((p: any) => p.id === planoParam)) {
       setPlanoId(planoParam)
     }
   }, [planos, planoParam])
+
+  function adicionarDependente() {
+    setDependentes([...dependentes, { ...depVazio }])
+  }
+
+  function atualizarDependente(i: number, campo: keyof Dependente, valor: string) {
+    const arr = [...dependentes]
+    if (campo === 'cpf') valor = formatarCPF(valor)
+    arr[i] = { ...arr[i], [campo]: valor }
+    setDependentes(arr)
+  }
+
+  function removerDependente(i: number) {
+    setDependentes(dependentes.filter((_, idx) => idx !== i))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -61,6 +94,15 @@ function CadastroPublicoInner() {
 
     if (!nome.trim()) { setErro('Nome completo é obrigatório.'); return }
     if (!telefone.replace(/\D/g, '')) { setErro('WhatsApp/telefone é obrigatório.'); return }
+
+    for (let i = 0; i < dependentes.length; i++) {
+      if (!dependentes[i].nome.trim()) {
+        setErro(`Dependente ${i + 1}: nome é obrigatório.`); return
+      }
+      if (!dependentes[i].data_nascimento) {
+        setErro(`Dependente ${i + 1}: data de nascimento é obrigatória.`); return
+      }
+    }
 
     setEnviando(true)
     try {
@@ -71,6 +113,11 @@ function CadastroPublicoInner() {
           nome, cpf, telefone, email,
           data_nascimento: dataNasc,
           plano_id: planoId || null,
+          dependentes: dependentes.map(d => ({
+            nome: d.nome.trim(),
+            cpf: d.cpf || null,
+            data_nascimento: d.data_nascimento,
+          })),
         }),
       })
       const json = await res.json()
@@ -114,43 +161,46 @@ function CadastroPublicoInner() {
         </div>
 
         {/* Formulário */}
-        <form onSubmit={handleSubmit} className="px-8 py-7 space-y-4">
+        <form onSubmit={handleSubmit} className="px-8 py-7 space-y-5">
 
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5" /> Nome completo *
-            </label>
-            <input value={nome} onChange={e => setNome(e.target.value)}
-              className={inputCls} placeholder="Seu nome completo" autoFocus />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">CPF</label>
-              <input value={cpf} onChange={e => setCpf(formatarCPF(e.target.value))}
-                className={inputCls} placeholder="000.000.000-00" maxLength={14} />
-            </div>
+          {/* Dados do titular */}
+          <div className="space-y-4">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5" /> WhatsApp *
+                <User className="w-3.5 h-3.5" /> Nome completo *
               </label>
-              <input value={telefone} onChange={e => setTelefone(formatarTelefone(e.target.value))}
-                className={inputCls} placeholder="(00) 00000-0000" maxLength={15} />
+              <input value={nome} onChange={e => setNome(e.target.value)}
+                className={inputCls} placeholder="Seu nome completo" autoFocus />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5" /> E-mail
-              </label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                className={inputCls} placeholder="seu@email.com" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">CPF</label>
+                <input value={cpf} onChange={e => setCpf(formatarCPF(e.target.value))}
+                  className={inputCls} placeholder="000.000.000-00" maxLength={14} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5" /> WhatsApp *
+                </label>
+                <input value={telefone} onChange={e => setTelefone(formatarTelefone(e.target.value))}
+                  className={inputCls} placeholder="(00) 00000-0000" maxLength={15} />
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Nascimento</label>
-              <input type="date" value={dataNasc} onChange={e => setDataNasc(e.target.value)}
-                className={inputCls} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5" /> E-mail
+                </label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  className={inputCls} placeholder="seu@email.com" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Nascimento</label>
+                <input type="date" value={dataNasc} onChange={e => setDataNasc(e.target.value)}
+                  className={inputCls} />
+              </div>
             </div>
           </div>
 
@@ -182,6 +232,83 @@ function CadastroPublicoInner() {
             )
           })()}
 
+          {/* Dependentes */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" /> Dependentes
+              </label>
+              {dependentes.length > 0 && (
+                <span className="text-xs text-slate-400">{dependentes.length} adicionado{dependentes.length > 1 ? 's' : ''}</span>
+              )}
+            </div>
+
+            {dependentes.map((dep, i) => {
+              const idade = calcularIdade(dep.data_nascimento)
+              const maior = idade !== null && idade >= 18
+              return (
+                <div key={i} className={`rounded-xl border-2 p-4 space-y-3 ${maior ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600">Dependente {i + 1}</span>
+                    <button type="button" onClick={() => removerDependente(i)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-600">Nome completo *</label>
+                    <input
+                      value={dep.nome}
+                      onChange={e => atualizarDependente(i, 'nome', e.target.value)}
+                      className={inputCls} placeholder="Nome do dependente" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">CPF</label>
+                      <input
+                        value={dep.cpf}
+                        onChange={e => atualizarDependente(i, 'cpf', e.target.value)}
+                        className={inputCls} placeholder="000.000.000-00" maxLength={14} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Nascimento *</label>
+                      <input
+                        type="date"
+                        value={dep.data_nascimento}
+                        onChange={e => atualizarDependente(i, 'data_nascimento', e.target.value)}
+                        className={inputCls} />
+                    </div>
+                  </div>
+
+                  {maior && (
+                    <div className="flex items-start gap-2 bg-amber-100 rounded-lg px-3 py-2">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-amber-700">
+                        <strong>{idade} anos</strong> — por ser maior de idade, será cadastrado como sócio titular e terá mensalidade própria.
+                      </p>
+                    </div>
+                  )}
+                  {idade !== null && idade < 18 && (
+                    <p className="text-xs text-slate-400">{idade} anos — dependente (sem mensalidade própria)</p>
+                  )}
+                </div>
+              )
+            })}
+
+            <button
+              type="button"
+              onClick={adicionarDependente}
+              className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl
+                         text-sm text-slate-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50
+                         transition-colors w-full justify-center"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar Dependente
+            </button>
+          </div>
+
           {erro && (
             <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">
               {erro}
@@ -190,7 +317,7 @@ function CadastroPublicoInner() {
 
           <button type="submit" disabled={enviando}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl
-                       transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
+                       transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
             {enviando ? 'Enviando...' : <><ChevronRight className="w-4 h-4" /> Enviar Cadastro</>}
           </button>
 
