@@ -303,7 +303,7 @@ export default function NovoSocioPage() {
         </Secao>
 
         <Secao titulo="Plano de Mensalidade" icone={CreditCard}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <Campo label="Plano">
               <select {...register('plano_id')} className={selectCls}>
                 <option value="">Selecionar plano (opcional)</option>
@@ -313,9 +313,6 @@ export default function NovoSocioPage() {
                   </option>
                 ))}
               </select>
-            </Campo>
-            <Campo label="Data de Início">
-              <input {...register('data_inicio_plano')} type="date" className={inputCls} />
             </Campo>
           </div>
           {planoEscolhido && (
